@@ -354,10 +354,10 @@ pub const LoRaWAN_DataMessage = struct {
         block_a[15] = 0x00; // I
     }
 
-    pub fn getDecryptedPayload(self: *LoRaWAN_DataMessage, key: [16]u8, out: []u8) !void {
+    pub fn getDecryptedPayload(self: *LoRaWAN_DataMessage, key: [16]u8, buffer: []u8) ![]u8 {
         const block_size = key.len;
 
-        if (out.len < self.frmpayload.len)
+        if (buffer.len < self.frmpayload.len)
             return error.InvalidBufferLength;
 
         var block_a = [_]u8{0} ** 16;
@@ -377,21 +377,22 @@ pub const LoRaWAN_DataMessage = struct {
             const end = @min(self.frmpayload.len, (i + 1) * block_size);
 
             // XOR the encrypted block with the payload
-            std.mem.copyForwards(u8, out[start..end], self.frmpayload[start..end]);
-            for (out[start..end], 0..) |*byte, j| {
+            std.mem.copyForwards(u8, buffer[start..end], self.frmpayload[start..end]);
+            for (buffer[start..end], 0..) |*byte, j| {
                 byte.* ^= encrypt_block[j];
             }
         }
+
+        return buffer[0..self.frmpayload.len];
     }
 
-    pub fn getEncryptedPayload(self: *LoRaWAN_DataMessage, key: [16]u8, out: []u8) !void {
-        try self.getDecryptedPayload(key, out);
+    pub fn getEncryptedPayload(self: *LoRaWAN_DataMessage, key: [16]u8, buffer: []u8) ![]u8 {
+        return try self.getDecryptedPayload(key, buffer);
     }
 
     pub fn encrypt(self: *LoRaWAN_DataMessage, key: [16]u8) !void {
         self.syncBuffer();
-        try self.getEncryptedPayload(key, &self.frmpayload_buffer);
-        self.frmpayload = self.frmpayload_buffer[0..self.frmpayload.len];
+        self.frmpayload = try self.getEncryptedPayload(key, &self.frmpayload_buffer);
     }
 
     pub fn decrypt(self: *LoRaWAN_DataMessage, key: [16]u8) !void {
@@ -582,7 +583,7 @@ test "test decrypt" {
 
     // decrypt
     var buffer = [_]u8{0} ** 255;
-    try lorawan_message.mac_payload.data_message.getDecryptedPayload(app_s_key, &buffer);
+    _ = try lorawan_message.mac_payload.data_message.getDecryptedPayload(app_s_key, &buffer);
     for (0..100) |i| {
         try std.testing.expectEqual(buffer[i], @as(u8, @intCast(i)));
     }
@@ -698,10 +699,10 @@ test "create lorawan unconfirmed_data_up message" {
 
     // decrypt message and check frmPayload and MIC
     var buffer: [255]u8 = undefined;
-    try lorawan_message.mac_payload.data_message.getDecryptedPayload(app_s_key, &buffer);
+    const decrypted_payload = try lorawan_message.mac_payload.data_message.getDecryptedPayload(app_s_key, &buffer);
 
     // Check that frmPayload is decrypted
-    try std.testing.expect(std.mem.eql(u8, buffer[0..frmpayload.len], &frmpayload));
+    try std.testing.expect(std.mem.eql(u8, decrypted_payload, &frmpayload));
 
     // Check MIC
     try std.testing.expect(lorawan_message.checkMIC(nwk_s_key));
