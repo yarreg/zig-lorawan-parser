@@ -12,18 +12,22 @@ pub fn build(b: *std.Build) void {
     // Required to be used as dependency in Zig package manager
     _ = b.addModule("lorawan", .{ .root_source_file = b.path("src/lib.zig") });
 
-    const lib = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
         .name = "lorawan",
-        .root_source_file = b.path("src/lib.zig"),
-        .target = target,
-        .optimize = optimize,
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/lib.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     b.installArtifact(lib);
 
     const main_tests = b.addTest(.{
-        .root_source_file = b.path("src/lib.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/lib.zig"),
+            .target = target,
+        }),
     });
 
     const run_main_tests = b.addRunArtifact(main_tests);

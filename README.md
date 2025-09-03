@@ -121,4 +121,4 @@ pub fn main() !void {
 ```
 
 # ZIG
-Tested with Zig 0.14.0
+Tested with Zig 0.15.1

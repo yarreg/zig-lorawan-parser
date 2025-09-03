@@ -421,7 +421,7 @@ pub const MACCommandDevice = CreateMACCommand(MACCommandIdDevice);
 fn CreateMACCommandList(comptime T: anytype) type {
     return struct {
         buffer: [255]T = undefined,
-        commands: []T = undefined,
+        commands: []T = &[_]T{},
         size: usize = 0,
 
         const max_mac_command_size = 15;
